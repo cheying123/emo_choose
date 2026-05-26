@@ -19,7 +19,13 @@
       "Bash(gh auth *)",
       "Bash(curl -L -o gh.msi \"https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_windows_amd64.msi\")",
       "Bash(msiexec /i gh.msi /quiet /norestart)",
-      "Bash(gh --version)"
+      "Bash(gh --version)",
+      "Bash(find /c/ -name \"gh.exe\" -type f 2>/dev/null | head -5)",
+      "Bash(ls -d \"Program Files/GitHub CLI\" \"Program Files \\(x86\\)/GitHub CLI\")",
+      "Bash(cmd.exe /c \"where gh\")",
+      "Bash(curl -L -o gh.zip \"https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_windows_amd64.zip\")",
+      "Bash(git remote *)",
+      "Bash(git rm *)"
     ]
   }
 }
