@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(pip install *)",
+      "Bash(python build_exe.py)",
+      "Bash(set PYTHONIOENCODING=utf-8)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import emotion_recognizer; import os; print\\('HF_ENDPOINT =', os.environ.get\\('HF_ENDPOINT', 'not set'\\)\\); print\\('OK'\\)\")",
+      "Bash(winget install *)",
+      "Bash(ls \"/c/Program Files \\(x86\\)/Inno Setup 6/ISCC.exe\" 2>/dev/null && echo \"Inno Setup READY\" || echo \"Inno Setup NOT FOUND\")",
+      "Read(//c/Program Files \\(x86\\)/Inno Setup 6/**)",
+      "Bash(./innosetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=\"C:\\\\InnoSetup\")",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(sleep 30 && ls /c/InnoSetup/ 2>/dev/null | head -10; echo \"---\"; ls /c/InnoSetup/ISCC.exe 2>/dev/null && echo \"ISCC FOUND\" || echo \"ISCC NOT FOUND\")",
+      "Read(//c//**)",
+      "Read(//c/InnoSetup/**)",
+      "Bash(python build_setup.py)",
+      "Bash(gh auth *)",
+      "Bash(curl -L -o gh.msi \"https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_windows_amd64.msi\")",
+      "Bash(msiexec /i gh.msi /quiet /norestart)",
+      "Bash(gh --version)"
+    ]
+  }
+}
