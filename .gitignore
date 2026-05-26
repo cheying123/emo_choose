@@ -21,3 +21,10 @@ Thumbs.db
 
 # Claude
 .claude/
+
+# Model cache
+.cache/
+.uploads/
+build_exe.py
+setup.py
+build_setup.py

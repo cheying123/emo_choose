@@ -11,6 +11,19 @@ import urllib.request
 import urllib.error
 
 # ============================================================
+# 模型缓存目录：存放在 EXE 旁边，不污染 C 盘
+# ============================================================
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+_CACHE_DIR = os.path.join(_APP_DIR, ".cache")
+
+os.environ.setdefault("HF_HOME", os.path.join(_CACHE_DIR, "huggingface"))
+os.environ.setdefault("TORCH_HOME", os.path.join(_CACHE_DIR, "torch"))
+
+# 确保缓存目录存在
+os.makedirs(os.environ["HF_HOME"], exist_ok=True)
+os.makedirs(os.environ["TORCH_HOME"], exist_ok=True)
+
+# ============================================================
 # HuggingFace 镜像自动检测（仅检查连接，不解锁重型依赖）
 # ============================================================
 _HF_ENDPOINT_TRIED = False
@@ -66,7 +79,7 @@ LABEL_MAP = {
 class EmotionRecognizer:
     """语音情绪识别器 - 基于 HuggingFace 预训练模型"""
 
-    def __init__(self, model_name=None, device=None, use_auth_token=None, progress_callback=None):
+    def __init__(self, model_name=None, device=None, token=None, progress_callback=None):
         self.emotions = [
             "neutral", "calm", "happy", "sad",
             "angry", "fearful", "disgust", "surprised",
@@ -77,7 +90,7 @@ class EmotionRecognizer:
         self.label_map = {}
         self.device = "cpu"
 
-        self._load_model(model_name, use_auth_token, progress_callback)
+        self._load_model(model_name, token, progress_callback)
 
     def _import_deps(self):
         """懒加载重型依赖（torch、transformers、librosa）"""
@@ -107,7 +120,7 @@ class EmotionRecognizer:
         except Exception:
             pass
 
-    def _load_model(self, model_name=None, use_auth_token=None, progress_callback=None):
+    def _load_model(self, model_name=None, token=None, progress_callback=None):
         """加载预训练模型（首次使用自动下载）"""
         # 先确保镜像检测
         ensure_hf_endpoint()
@@ -139,28 +152,34 @@ class EmotionRecognizer:
                         print("正在下载模型（约 1.5GB），请耐心等待...")
                         snapshot_download(
                             repo_id=name,
-                            use_auth_token=use_auth_token,
+                            token=token,
                             callback=progress_callback,
                         )
                     except Exception as cb_err:
                         print(f"  下载进度回退: {cb_err}")
 
                 self.feature_extractor = self._Wav2Vec2FeatureExtractor.from_pretrained(
-                    name, use_auth_token=use_auth_token
+                    name, token=token
                 )
                 self.model = self._Wav2Vec2ForSequenceClassification.from_pretrained(
-                    name, use_auth_token=use_auth_token
+                    name, token=token
                 )
                 self.model.to(self.device)
                 self.model.eval()
                 self.model_name = name
 
-                # 构建标签映射
+                # 构建标签映射：如果模型标签是占位符(LABEL_0)则用我们的情绪列表
                 model_labels = self.model.config.id2label
                 if model_labels:
-                    for idx, label_text in model_labels.items():
-                        mapped = LABEL_MAP.get(label_text.lower(), label_text.lower())
-                        self.label_map[int(idx)] = mapped
+                    first = list(model_labels.values())[0].lower()
+                    if first.startswith("label_"):
+                        all_e = self.emotions + ['neutral','happy','sad','angry','fearful']
+                        self.label_map = {i: all_e[i] if i < len(all_e) else 'neutral'
+                                          for i in range(len(model_labels))}
+                    else:
+                        for idx, label_text in model_labels.items():
+                            mapped = LABEL_MAP.get(label_text.lower(), label_text.lower())
+                            self.label_map[int(idx)] = mapped
                 else:
                     self.label_map = {i: e for i, e in enumerate(self.emotions)}
 
