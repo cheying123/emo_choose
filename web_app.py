@@ -249,15 +249,14 @@ function showResult(d){
 document.getElementById("singleResult").style.display="block";
 document.getElementById("resultEmotion").textContent=EMOCN(d.emotion)+"  ("+(d.confidence*100).toFixed(1)+"%)";
 const colors=["#6366f1","#8b5cf6","#a855f7","#d946ef","#ec4899","#f43f5e","#ef4444","#f97316"];
-let html="";
-d.top_k.forEach((item,i)=>{
+let html='<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:8px">';
+d.top_k.slice(0,5).forEach((item,i)=>{
 const pct=(item.score*100).toFixed(1);
-html+='<div style="display:flex;align-items:center;gap:12px;margin:6px 0">';
-html+='<div style="width:70px;font-size:14px;text-align:right">'+EMOCN(item.label)+'</div>';
-html+='<div style="flex:1;height:22px;background:#e5e7eb;border-radius:6px;overflow:hidden">';
-html+='<div style="height:100%;border-radius:6px;width:'+pct+'%;background:'+colors[i%colors.length]+';display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11px;color:#fff;font-weight:600">'+pct+'%</div></div>';
-html+='<div style="width:50px;font-size:12px;color:#888">'+item.score.toFixed(4)+'</div></div>';
+html+='<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;background:'+colors[i%colors.length]+'20;border:1px solid '+colors[i%colors.length]+'40;font-size:13px">';
+html+='<span style="font-weight:600;color:'+colors[i%colors.length]+'">'+EMOCN(item.label)+'</span>';
+html+='<span style="color:#666;font-size:12px">'+pct+'%</span></div>';
 });
+html+='</div>';
 document.getElementById("topkContainer").innerHTML=html;
 }
 
