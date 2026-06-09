@@ -332,40 +332,6 @@ a.href=url;a.download="emotion_results.csv";
 a.click();
 URL.revokeObjectURL(url);
 }
-else{
-const top=r.result.top_k||[];
-const t1=top[0]?EMOCN(top[0].label)+" "+(top[0].score*100).toFixed(1)+"%":"-";
-const t2=top[1]?EMOCN(top[1].label)+" "+(top[1].score*100).toFixed(1)+"%":"-";
-const t3=top[2]?EMOCN(top[2].label)+" "+(top[2].score*100).toFixed(1)+"%":"-";
-rows.push([r.file,EMOCN(r.result.emotion),(r.result.confidence*100).toFixed(1)+"%",t1,t2,t3]);
-}
-});
-let csv="﻿";
-rows.forEach(r=>csv+=r.join(",")+"
-");
-const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
-const url=URL.createObjectURL(blob);
-const a=document.createElement("a");
-a.href=url;a.download="emotion_results.csv";a.click();
-URL.revokeObjectURL(url);
-}
-});
-let csv="﻿";
-rows.forEach(row=>{csv+=row.join(",")+"
-";});
-const blob=new Blob(["﻿"+csv],[type:"text/csv;charset=utf-8"]);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="emotion_results.csv";a.click();URL.revokeObjectURL(url);
-});
-const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="emotion_results.csv";a.click();URL.revokeObjectURL(url);
-}
-
-// === AI 分析 ===
-const adz=document.getElementById("analyzeDropZone"),afi=document.getElementById("analyzeFileInput");
-adz.onclick=()=>afi.click();
-adz.ondragover=e=>{e.preventDefault();adz.classList.add("dragover");};
-adz.ondragleave=()=>adz.classList.remove("dragover");
-adz.ondrop=e=>{e.preventDefault();adz.classList.remove("dragover");addAnalyze(e.dataTransfer.files);};
-afi.onchange=()=>{addAnalyze(afi.files);afi.value="";};
-
 function addAnalyze(files){
 for(const f of files){const ext="."+f.name.split(".").pop().toLowerCase();if(ACCEPT.includes(ext))analyzeFiles.push(f);}
 renderAnalyze();updateButtons();
@@ -528,6 +494,11 @@ def index():
 @app.route("/api/status")
 def api_status():
     return jsonify(model_status)
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
 
 
 @app.route("/api/predict", methods=["POST"])
