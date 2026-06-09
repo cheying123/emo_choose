@@ -307,11 +307,53 @@ h+="</tr>";});
 document.getElementById("batchTbody").innerHTML=h;document.getElementById("batchBtn").disabled=false;updateButtons();
 }
 
+
 function downloadCSV(){
-let csv="\\uFEFF文件名,情绪,置信度,Top-3\\n";
-batchResults.forEach(r=>{
-if(r.result.error){csv+=r.file+",失败,0,"+r.result.error+"\\n";}
-else{const d=(r.result.top_k||[]).map(t=>EMOCN(t.label)+":"+(t.score*100).toFixed(1)+"%").join("; ");csv+=r.file+","+EMOCN(r.result.emotion)+","+(r.result.confidence*100).toFixed(1)+"%,"+d+"\\n";}
+let rows=[];
+rows.push([String.fromCharCode(65279)+"文件名","情绪","置信度","Top1","Top2","Top3"]);
+batchResults.forEach(function(r){
+var row;
+if(r.result.error){
+row=[r.file,"失败","-","-","-","-"];
+}else{
+var top=r.result.top_k||[];
+var t1=top[0]?EMOCN(top[0].label)+" "+(top[0].score*100).toFixed(1)+"%":"-";
+var t2=top[1]?EMOCN(top[1].label)+" "+(top[1].score*100).toFixed(1)+"%":"-";
+var t3=top[2]?EMOCN(top[2].label)+" "+(top[2].score*100).toFixed(1)+"%":"-";
+row=[r.file,EMOCN(r.result.emotion),(r.result.confidence*100).toFixed(1)+"%",t1,t2,t3];
+}
+rows.push(row);
+});
+var csvStr=rows.map(function(r){return r.join(",");}).join(String.fromCharCode(10));
+var blob=new Blob([csvStr],{type:"text/csv;charset=utf-8"});
+var url=URL.createObjectURL(blob);
+var a=document.createElement("a");
+a.href=url;a.download="emotion_results.csv";
+a.click();
+URL.revokeObjectURL(url);
+}
+else{
+const top=r.result.top_k||[];
+const t1=top[0]?EMOCN(top[0].label)+" "+(top[0].score*100).toFixed(1)+"%":"-";
+const t2=top[1]?EMOCN(top[1].label)+" "+(top[1].score*100).toFixed(1)+"%":"-";
+const t3=top[2]?EMOCN(top[2].label)+" "+(top[2].score*100).toFixed(1)+"%":"-";
+rows.push([r.file,EMOCN(r.result.emotion),(r.result.confidence*100).toFixed(1)+"%",t1,t2,t3]);
+}
+});
+let csv="﻿";
+rows.forEach(r=>csv+=r.join(",")+"
+");
+const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+const url=URL.createObjectURL(blob);
+const a=document.createElement("a");
+a.href=url;a.download="emotion_results.csv";a.click();
+URL.revokeObjectURL(url);
+}
+});
+let csv="﻿";
+rows.forEach(row=>{csv+=row.join(",")+"
+";});
+const blob=new Blob(["﻿"+csv],[type:"text/csv;charset=utf-8"]);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="emotion_results.csv";a.click();URL.revokeObjectURL(url);
 });
 const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="emotion_results.csv";a.click();URL.revokeObjectURL(url);
 }
