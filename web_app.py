@@ -151,23 +151,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
 <div style="font-size:28px">&#x1F916;</div>
 <div><div style="font-weight:600;font-size:15px">AI 参考音频分析</div>
-<div style="font-size:12px;color:#888">输入台词文本，AI 自动分析情绪并推荐​主/副参考音频</div></div></div>
-<textarea id="scriptInput" placeholder="在此输入台词文本，每行一段话...
+<div style="font-size:12px;color:#888">输入台词 + 上传多条音频，AI 分析哪个版本情绪表达最到位</div></div></div>
+
+<div style="margin-bottom:8px"><strong style="font-size:14px">&#x1F4DD; 1. 输入台词文本</strong>
+<div style="font-size:12px;color:#888;margin-bottom:4px">每行一段话，用于分析文本预期情绪</div></div>
+<textarea id="scriptInput" placeholder="每行一段台词...
 
 例如：
 你今天看起来很开心。
 我真的很难过。
 不要生气，听我解释。
-哇，太 surprise 了！" style="width:100%;height:150px;padding:12px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;outline:none"></textarea>
-<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-<label style="font-size:13px;color:#888">&#x1F4C4; 或上传文本文件(.txt)</label>
-<input type="file" id="txtFileInput" accept=".txt" style="font-size:13px">
-</div></div>
-<button class="btn btn-warning" id="analyzeBtn" onclick="analyzeText()">&#x1F916; AI 分析文本</button>
+哇，太 surprise 了！" style="width:100%;height:100px;padding:10px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;outline:none"></textarea>
+
+<div style="margin:12px 0 8px 0"><strong style="font-size:14px">&#x1F3A4; 2. 上传音频</strong>
+<div style="font-size:12px;color:#888">音频会被逐一识别情绪，与台词预期情绪对比。建议以序号开头对应台词行。</div></div>
+<div class="upload-zone" id="analyzeAudioDropZone" style="padding:16px">
+<div class="icon">&#x1F4C2;</div><div class="text">点击或拖放音频文件</div><div class="sub">WAV / MP3 / FLAC / M4A / AAC</div>
+<input type="file" id="analyzeAudioInput" multiple accept=".wav,.mp3,.flac,.m4a,.aac,audio/*">
+</div>
+<div class="file-list" id="analyzeAudioList"></div>
+</div>
+<button class="btn btn-warning" id="analyzeBtn" disabled onclick="startAnalyze()">&#x1F916; AI 综合分析（需要 2+ 句台词和 2+ 个音频）</button>
+<div class="batch-progress" id="analyzeProgress">
+<div class="status-bar" style="margin:0"><span class="dot blue"></span><span id="analyzeProgressText">分析中...</span></div>
+<div class="progress-wrap" style="margin:8px 0 0 0"><div class="progress-bar" id="analyzeProgressBar" style="width:0%"></div></div></div>
 <div class="card" id="analyzeResult" style="display:none">
-<div class="card-title">&#x1F9E0; AI 推荐结果</div>
+<div class="card-title">&#x1F9E0; AI 综合分析结果</div>
 <div id="analyzeContent"></div>
-<div class="btn-row"><button class="btn-outline" onclick="downloadReport()">&#x1F4E5; 导出报告</button></div>
+<div class="btn-row"><button class="btn-outline" onclick="downloadAnalyzeReport()">&#x1F4E5; 导出报告</button></div>
 </div></div>
 
 <div class="footer">语音情绪识别系统 v2.0</div></div>
@@ -335,20 +346,9 @@ a.href=url;a.download="emotion_results.csv";
 a.click();
 URL.revokeObjectURL(url);
 }
-function addAnalyze(files){
-for(const f of files){const ext="."+f.name.split(".").pop().toLowerCase();if(ACCEPT.includes(ext))analyzeFiles.push(f);}
-renderAnalyze();updateButtons();
-}
-function removeAnalyze(idx){analyzeFiles.splice(idx,1);renderAnalyze();updateButtons();}
-function renderAnalyze(){
-const el=document.getElementById("analyzeFileList");
-if(analyzeFiles.length===0){el.innerHTML="";return;}
-let h='<div style="font-size:13px;color:#888;margin-bottom:6px">共 '+analyzeFiles.length+' 个文件（至少需要 2 个）</div>';
-analyzeFiles.forEach((f,i)=>{h+='<div class="file-item"><span class="name">'+f.name+' ('+(f.size/1024/1024).toFixed(1)+' MB)</span><span class="rm" onclick="removeAnalyze('+i+')">&#x2715;</span></div>';});
-el.innerHTML=h;
-}
-
-const EMOKEY={
+// === AI 综合分析（文本预期 + 音频实际情绪匹配）===
+var analyzeAudioFiles=[];
+var EMOKEY2={
 "快乐":["开心","高兴","快乐","哈哈","耶","好棒","太好了","喜欢","爱","幸福","微笑","笑","嘻嘻","乐","愉快","欢","爽","happy"],
 "悲伤":["难过","伤心","悲伤","哭","泪","痛","失落","孤独","寂寞","悲","忧伤","sad","cry"],
 "愤怒":["生气","愤怒","烦","讨厌","恨","气死","怒","恼火","暴躁","angry","furious"],
@@ -358,100 +358,106 @@ const EMOKEY={
 "中性":["嗯","哦","好的","可以","知道","明白","行","OK","neutral"],
 "厌恶":["恶心","讨厌","反感","厌恶","disgust","gross"]
 };
+var emoIcon={"快乐":"😊","悲伤":"😢","愤怒":"😠","恐惧":"😨","惊讶":"😲","平静":"😌","中性":"😐","厌恶":"🤢"};
 
-document.getElementById("txtFileInput").onchange=function(){
-var file=this.files[0];if(!file)return;
-var reader=new FileReader();
-reader.onload=function(e){document.getElementById("scriptInput").value=e.target.result;};
-reader.readAsText(file,"utf-8");
-};
+document.getElementById("analyzeAudioInput").onchange=function(){addAudioFiles(this.files);this.value="";};
+var azDrop=document.getElementById("analyzeAudioDropZone");
+azDrop.ondragover=function(e){e.preventDefault();this.classList.add("dragover");};
+azDrop.ondragleave=function(){this.classList.remove("dragover");};
+azDrop.ondrop=function(e){e.preventDefault();this.classList.remove("dragover");addAudioFiles(e.dataTransfer.files);};
+azDrop.onclick=function(){document.getElementById("analyzeAudioInput").click();};
 
-function analyzeText(){
+function addAudioFiles(files){for(var i=0;i<files.length;i++){var ext="."+files[i].name.split(".").pop().toLowerCase();if([".wav",".mp3",".flac",".m4a",".aac"].indexOf(ext)>=0)analyzeAudioFiles.push(files[i]);}renderAudioFiles();updateBtn2();}
+function removeAudio(idx){analyzeAudioFiles.splice(idx,1);renderAudioFiles();updateBtn2();}
+function renderAudioFiles(){var el=document.getElementById("analyzeAudioList");if(analyzeAudioFiles.length===0){el.innerHTML="";return;}var h="<div style=\"font-size:13px;color:#888;margin-bottom:6px\">共 "+analyzeAudioFiles.length+" 个音频</div>";for(var i=0;i<analyzeAudioFiles.length;i++)h+="<div class=\"file-item\"><span class=\"name\">"+analyzeAudioFiles[i].name+"</span><span class=\"rm\" onclick=\"removeAudio("+i+")\">&#x2715;</span></div>";el.innerHTML=h;}
+function updateBtn2(){var n=document.getElementById("scriptInput").value.trim().split("\\n").filter(function(l){return l.trim();}).length;var b=document.getElementById("analyzeBtn");if(n>=2&&analyzeAudioFiles.length>=2){b.disabled=false;b.innerHTML="&#x1F916; AI 综合分析";}else{b.disabled=true;b.innerHTML="&#x23F3; 需要 2+ 句台词和 2+ 个音频";}}
+document.getElementById("scriptInput").oninput=updateBtn2;
+
+async function startAnalyze(){
 var text=document.getElementById("scriptInput").value.trim();
-if(!text){alert("请先输入台词文本");return;}
-var lines=text.split("\n").filter(function(l){return l.trim();});
-if(lines.length<2){alert("至少需要 2 行文本");return;}
+var lines=text.split("\\n").filter(function(l){return l.trim();});
+if(lines.length<2||analyzeAudioFiles.length<2){alert("至少需要 2 行台词和 2 个音频");return;}
 document.getElementById("analyzeResult").style.display="none";
-var results=[];
-lines.forEach(function(line){
-var trim=line.trim();
-var scores={};for(var emo in EMOKEY){scores[emo]=0;}
-var total=0;
-for(var emo in EMOKEY){
-EMOKEY[emo].forEach(function(kw){
-var reg=new RegExp(kw,"gi");var m=trim.match(reg);
-if(m){scores[emo]+=m.length;total+=m.length;}
-});
+document.getElementById("analyzeProgress").classList.add("show");
+var bar=document.getElementById("analyzeProgressBar"),txt=document.getElementById("analyzeProgressText");
+document.getElementById("analyzeBtn").disabled=true;
+
+// 1. 文本预期情绪分析
+var textR=[];
+for(var i=0;i<lines.length;i++){
+var trim=lines[i].trim();var sc={};for(var e in EMOKEY2){sc[e]=0;}var tot=0;
+for(var e in EMOKEY2){EMOKEY2[e].forEach(function(kw){var r=new RegExp(kw,"gi");var m=trim.match(r);if(m){sc[e]+=m.length;tot+=m.length;}});}
+var te="中性",ts=0;for(var e in sc){if(sc[e]>ts){te=e;ts=sc[e];}}
+textR.push({text:trim,emo:te});
 }
-var topEmo="中性",topScore=0;
-for(var emo in scores){if(scores[emo]>topScore){topEmo=emo;topScore=scores[emo];}}
-var confidence=total>0?Math.min(1,topScore/total*1.5):0.1;
-var s=50;
-if(topEmo==="中性"||topEmo==="平静")s+=35;
-else if(topEmo==="快乐")s+=20;
-else if(topEmo==="惊讶")s+=10;
-else if(topEmo==="悲伤")s-=5;
-else if(topEmo==="愤怒"||topEmo==="恐惧")s-=10;
-s+=Math.min(confidence,0.9)*20;
-s=Math.max(10,Math.min(100,Math.round(s)));
-results.push({text:trim,emotion:topEmo,confidence:Math.round(confidence*1000)/10000,score:s});
-});
-results.sort(function(a,b){return b.score-a.score;});
-var html='<div style="margin-bottom:12px;font-size:13px;color:#888">共分析 '+lines.length+' 句台词，按推荐评分排序</div>';
+
+// 2. 音频情绪识别
+var audioR=[];
+for(var i=0;i<analyzeAudioFiles.length;i++){
+bar.style.width=((i+1)/analyzeAudioFiles.length*100)+"%";
+txt.textContent="识别 ["+(i+1)+"/"+analyzeAudioFiles.length+"] "+analyzeAudioFiles[i].name;
+var fd=new FormData();fd.append("audio",analyzeAudioFiles[i]);
+try{
+var r=await fetch("/api/predict",{method:"POST",body:fd});var d=await r.json();
+audioR.push({file:analyzeAudioFiles[i].name,emo:d.emotion,conf:d.confidence,err:null});
+}catch(e){audioR.push({file:analyzeAudioFiles[i].name,emo:"error",conf:0,err:e.message});}
+}
+
+// 3. 匹配
+var all=[];
+for(var i=0;i<audioR.length;i++){
+var a=audioR[i];if(a.err){all.push({file:a.file,err:a.err,score:0});continue;}
+var m=a.file.match(/^(\\d+)/);
+var idx=m?parseInt(m[1])-1:-1;
+var exp=idx>=0&&idx<textR.length?textR[idx]:null;
+var s=0,ee="-",et="(未匹配)";
+if(exp){
+s=(a.emo===exp.emo?100:(a.emo==="neutral"&&exp.emo==="平静")||(a.emo==="平静"&&exp.emo==="neutral")?85:40);
+s=s*0.6+a.conf*0.4*100;if(a.emo==="愤怒"||a.emo==="恐惧")s*=0.85;
+et=exp.text;ee=exp.emo;
+}else{s=a.conf*100;}
+s=Math.round(s);
+all.push({file:a.file,audioEmo:a.emo,audioConf:a.conf,text:et,expectEmo:ee,score:s,err:null});
+}
+all.sort(function(a,b){return b.score-a.score;});
+
 var colors=["#22c55e","#f59e0b","#ef4444"];
-results.forEach(function(r,i){
+var html="<div style=\"margin-bottom:12px;font-size:13px;color:#888\">共识别 "+audioR.length+" 条，匹配度越高越适合作参考</div>";
+for(var i=0;i<all.length;i++){
+var r=all[i];
+if(r.err){html+="<div class=\"rank-card\"><div style=\"color:#ef4444\">&#x274C; "+r.file+" - "+r.err+"</div></div>";continue;}
 var badge=i===0?"&#x1F947; 主参考":i===1?"&#x1F948; 副参考":"&#x1F4AD; 备选";
-var badgeClass=i===0?"gold":i===1?"silver":"";
-html+='<div '+(i===0?'class="rank-card top1"':i===1?'class="rank-card top2"':'class="rank-card"')+'>';
-html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="rank-badge '+badgeClass+'">'+badge+'</span>';
-html+='<strong style="font-size:14px">"'+r.text.slice(0,40)+(r.text.length>40?"...":"")+'"</strong></div>';
-var pct=(r.confidence*100).toFixed(1);
-var color=r.score>=80?colors[0]:r.score>=60?colors[1]:colors[2];
-var emoji={"快乐":"😊","悲伤":"😢","愤怒":"😠","恐惧":"😨","惊讶":"😲","平静":"😌","中性":"😐","厌恶":"🤢"};
-var reason="";
-if(r.emotion==="中性"||r.emotion==="平静")reason="情绪稳定，适合作参考";
-else if(r.emotion==="快乐")reason="情绪积极，适合带情感的参考";
-else if(r.emotion==="悲伤"||r.emotion==="愤怒"||r.emotion==="恐惧")reason="情绪强烈，不适合做中性参考";
-else reason="情绪适中";
-html+='<div class="ai-score" style="margin-top:8px">';
-html+='<div class="ai-score-item"><div class="ai-score-val">'+r.score+'</div><div class="ai-score-label">评分</div></div>';
-html+='<div class="ai-score-item"><div class="ai-score-val">'+pct+'%</div><div class="ai-score-label">置信度</div></div>';
-html+='<div class="ai-score-item"><div class="ai-score-val">'+(emoji[r.emotion]||"")+' '+r.emotion+'</div><div class="ai-score-label">情绪</div></div>';
-html+='<div style="flex:1;min-width:80px"><div class="ai-score-label">评分</div><div style="height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+r.score+'%;background:'+color+';border-radius:4px"></div></div></div>';
-html+='</div>';
-html+='<div class="ai-reason">'+reason+'。</div></div>';
-});
-html+='<div style="margin-top:12px;padding:10px;background:#f8f9ff;border-radius:8px;font-size:12px;color:#666">';
-html+='<strong>说明：</strong>基于关键词情绪分析。<strong>中性/平静</strong>得分最高，最适合作为参考音频。</div>';
+var bc=i===0?"gold":i===1?"silver":"";
+var cc=i===0?'class="rank-card top1"':i===1?'class="rank-card top2"':'class="rank-card"';
+var sc=r.score>=80?colors[0]:r.score>=60?colors[1]:colors[2];
+html+="<div "+cc+"><div style=\"display:flex;align-items:center;gap:8px;flex-wrap:wrap\"><span class=\"rank-badge "+bc+"\">"+badge+"</span><strong>"+r.file+"</strong></div>";
+html+="<div class=\"ai-score\" style=\"margin-top:8px\">";
+html+="<div class=\"ai-score-item\"><div class=\"ai-score-val\" style=\"color:"+sc+"\">"+r.score+"</div><div class=\"ai-score-label\">匹配度</div></div>";
+html+="<div class=\"ai-score-item\"><div class=\"ai-score-val\">"+(emoIcon[r.audioEmo]||"")+" "+r.audioEmo+"</div><div class=\"ai-score-label\">实际情绪</div></div>";
+html+="<div class=\"ai-score-item\"><div class=\"ai-score-val\" style=\"font-size:16px\">"+(r.audioConf*100).toFixed(0)+"%</div><div class=\"ai-score-label\">置信度</div></div>";
+html+="<div class=\"ai-score-item\"><div class=\"ai-score-val\" style=\"font-size:16px\">&#x1F4DD; "+r.expectEmo+"</div><div class=\"ai-score-label\">预期情绪</div></div>";
+html+="<div style=\"flex:1;min-width:80px\"><div class=\"ai-score-label\">匹配度</div><div style=\"height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden\"><div style=\"height:100%;width:"+r.score+"%;background:"+sc+";border-radius:4px\"></div></div></div></div>";
+var reason=r.audioEmo===r.expectEmo?"实际表达与预期一致。":"实际表达（"+r.audioEmo+"）与预期（"+r.expectEmo+"）有差异。";
+if(r.score>=85)reason="高度匹配，非常适合做参考音频。";
+html+="<div class=\"ai-reason\" style=\"margin-top:6px;font-size:12px\">对应: &quot;"+(r.text.length>45?r.text.slice(0,45)+"...":r.text)+"&quot;<br>"+reason+"</div></div>";
+}
+html+="<div style=\"margin-top:12px;padding:10px;background:#f8f9ff;border-radius:8px;font-size:12px;color:#666\">";
+html+="<strong>说明：</strong>匹配度 = 音频实际情绪与文本预期情绪的接近程度 + 置信度加权。匹配度越高越适合做参考音频。</div>";
 document.getElementById("analyzeContent").innerHTML=html;
 document.getElementById("analyzeResult").style.display="block";
+bar.style.width="100%";txt.textContent="完成!";
+document.getElementById("analyzeProgress").classList.remove("show");
+document.getElementById("analyzeBtn").disabled=false;
 }
 
-function downloadReport(){
-var txt=document.getElementById("scriptInput").value.trim();
-var lines=txt.split("\n").filter(function(l){return l.trim();});
-var report="语音情绪识别系统 - AI 文本分析报告\r\n";
-report+="生成时间: "+new Date().toLocaleString()+"\r\n";
-report+="=".repeat(50)+"\r\n\r\n输入文本:\r\n"+txt+"\r\n\r\n";
-report+="=".repeat(50)+"\r\n推荐结果:\r\n\r\n";
-var results=[];
-lines.forEach(function(line){
-var trim=line.trim();var scores={};for(var e in EMOKEY){scores[e]=0;}var t=0;
-for(var e in EMOKEY){EMOKEY[e].forEach(function(kw){var r=new RegExp(kw,"gi");var m=trim.match(r);if(m){scores[e]+=m.length;t+=m.length;}});}
-var te="中性",ts=0;for(var e in scores){if(scores[e]>ts){te=e;ts=scores[e];}}
-var c=t>0?Math.min(1,ts/t*1.5):0.1;
-var s=50;if(te==="中性"||te==="平静")s+=35;else if(te==="快乐")s+=20;else if(te==="惊讶")s+=10;else if(te==="悲伤")s-=5;else if(te==="愤怒"||te==="恐惧")s-=10;
-s+=Math.min(c,0.9)*20;s=Math.max(10,Math.min(100,Math.round(s)));
-results.push({text:trim,emotion:te,confidence:c,score:s});
-});
-results.sort(function(a,b){return b.score-a.score;});
-results.forEach(function(r,i){
-report+=(i+1)+". "+r.text+"\r\n";
-report+="   情绪: "+r.emotion+" | "+(r.confidence*100).toFixed(1)+"% | 评分: "+r.score+"/100\r\n";
-report+="   推荐: "+(i===0?"主参考":i===1?"副参考":"备选")+"\r\n\r\n";
-});
+function downloadAnalyzeReport(){
+var d=new Date();
+var report="AI 综合分析报告\\r\\n生成时间: "+d.toLocaleString();
+report+="\\r\\n==================================================\\r\\n\\r\\n";
+report+="【输入文本】\\r\\n"+document.getElementById("scriptInput").value.trim()+"\\r\\n\\r\\n";
+report+="【分析结果】请从页面查看。\\r\\n";
 var blob=new Blob([report],{type:"text/plain;charset=utf-8"});
-var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download="text_analysis_report.txt";a.click();URL.revokeObjectURL(url);
+var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download="analyze_report.txt";a.click();URL.revokeObjectURL(url);
 }
 </script>
 </body>
