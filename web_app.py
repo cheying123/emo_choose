@@ -376,20 +376,17 @@ document.getElementById("scriptInput").oninput=updateBtn2;
 async function startAnalyze(){
 var text=document.getElementById("scriptInput").value.trim();
 var lines=text.split("\\n").filter(function(l){return l.trim();});
-if(lines.length<2||analyzeAudioFiles.length<2){alert("至少需要 2 行台词和 2 个音频");return;}
+if(text.trim().length<1||analyzeAudioFiles.length<2){alert("至少需要 1 句台词和 2 个音频");return;}
 document.getElementById("analyzeResult").style.display="none";
 document.getElementById("analyzeProgress").classList.add("show");
 var bar=document.getElementById("analyzeProgressBar"),txt=document.getElementById("analyzeProgressText");
 document.getElementById("analyzeBtn").disabled=true;
 
-// 1. 文本预期情绪分析
-var textR=[];
-for(var i=0;i<lines.length;i++){
-var trim=lines[i].trim();var sc={};for(var e in EMOKEY2){sc[e]=0;}var tot=0;
-for(var e in EMOKEY2){EMOKEY2[e].forEach(function(kw){var r=new RegExp(kw,"gi");var m=trim.match(r);if(m){sc[e]+=m.length;tot+=m.length;}});}
-var te="中性",ts=0;for(var e in sc){if(sc[e]>ts){te=e;ts=sc[e];}}
-textR.push({text:trim,emo:te});
-}
+// 1. 文本预期情绪分析（整段文本）
+var textEmo="中性",tmpSc={};for(var e in EMOKEY2){tmpSc[e]=0;}
+var tmpTot=0;
+for(var e in EMOKEY2){EMOKEY2[e].forEach(function(kw){var r=new RegExp(kw,"gi");var m=text.match(r);if(m){tmpSc[e]+=m.length;tmpTot+=m.length;}});}
+var ts2=0;for(var e in tmpSc){if(tmpSc[e]>ts2){textEmo=e;ts2=tmpSc[e];}}
 
 // 2. 音频情绪识别
 var audioR=[];
@@ -403,21 +400,15 @@ audioR.push({file:analyzeAudioFiles[i].name,emo:d.emotion,conf:d.confidence,err:
 }catch(e){audioR.push({file:analyzeAudioFiles[i].name,emo:"error",conf:0,err:e.message});}
 }
 
-// 3. 匹配
+// 3. 匹配：所有音频与同一段文本对比
 var all=[];
 for(var i=0;i<audioR.length;i++){
 var a=audioR[i];if(a.err){all.push({file:a.file,err:a.err,score:0});continue;}
-var m=a.file.match(/^(\\d+)/);
-var idx=m?parseInt(m[1])-1:-1;
-var exp=idx>=0&&idx<textR.length?textR[idx]:null;
-var s=0,ee="-",et="(未匹配)";
-if(exp){
-s=(a.emo===exp.emo?100:(a.emo==="neutral"&&exp.emo==="平静")||(a.emo==="平静"&&exp.emo==="neutral")?85:40);
+var s=0;
+s=(a.emo===textEmo?100:(a.emo==="neutral"&&textEmo==="平静")||(a.emo==="平静"&&textEmo==="neutral")?85:40);
 s=s*0.6+a.conf*0.4*100;if(a.emo==="愤怒"||a.emo==="恐惧")s*=0.85;
-et=exp.text;ee=exp.emo;
-}else{s=a.conf*100;}
 s=Math.round(s);
-all.push({file:a.file,audioEmo:a.emo,audioConf:a.conf,text:et,expectEmo:ee,score:s,err:null});
+all.push({file:a.file,audioEmo:a.emo,audioConf:a.conf,text:text,expectEmo:textEmo,score:s,err:null});
 }
 all.sort(function(a,b){return b.score-a.score;});
 
